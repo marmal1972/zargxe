@@ -1,0 +1,389 @@
+# Practical 2
+
+In this computer practical we practice with the Finlay-Wilkinson, AMMI and GGE models using data consisting of adjusted means per environment (stage 2 data).
+
+After completing this practical you should be able to:
+
+* Use table of genotype by environment means to produce and interpret simple summary statistics and graphs to diagnose GxE (heterogeneity of variance and correlations between environments).
+
+* Formulate the Finlay-Wilkinson (FW) regression model, use R to fit the model, and be able to interpret the output parameters.
+
+* Write the AMMI and GGE models, fit the AMMI model with R, and to interpret AMMI and GGE biplots.
+
+
+## Description of the data set
+
+A series of trials were conducted during 1989 to assess the yield of 16 Triticale genotypes in 10 Spanish locations. Each experiment was designed as a randomized complete block design (RCBD) with four blocks per site. In this practical we use the adjusted means per genotype so we start at the second stage of the GxE analysis.
+
+Triticale (2x=AABBRR) is an inter-specific hybrid between *Triticum turgidum* (2x=AABB) and *Secale cereale* (2x=RR). In addition, substituted triticales are a variation obtained by replacing the Rye chromosome 2R, by chromosome 2D of Triticum aestivum. Ten of the 16 tested genotypes were substituted lines, and the remaining six were complete lines.
+
+The locations used in this research differed in their conditions by a number of environmental characteristics, of which pH (alkaline versus acid) was an important one. A complete description of the environments can be found in Table 1 of the original publication by Royo et al. (1993).
+
+We first load and visualize the data table:
+
+```{r, eval=FALSE}
+# adjust the path to the data file
+load("../2_Practicals/data/Triticale 1989 data.RData")
+triticale
+```
+
+The simple plot below shows the genotype by location matrix, with all genotypes present in all the locations (the colours corresponds to the two types of genotypes: Complete and Substituted):
+
+```{r, eval=FALSE}
+toplot <- distinct(triticale, Geno, Type, Loc)
+
+ggplot(toplot, aes(x = Geno, y = Loc, colour = Type)) +
+  geom_point(size = 4, shape = "x") +
+  labs(x = "Genotype", y = "Location")
+```
+
+
+
+## Summary statistics and plots
+
+
+We start by obtaining simple summary statistics and plots as a first stage to explore the GxE.
+
+a) Rank locations and sort them from worst to best.
+
+```{r, eval=FALSE}
+table1 <- triticale |> group_by(Loc) |> 
+  summarise(mean = mean(yield, na.rm = TRUE),
+            var = var(yield, na.rm = TRUE)) 
+
+reactable(table1, 
+          bordered = TRUE, highlight = TRUE, defaultPageSize = 10,
+          defaultColDef = colDef(width = 100, format = colFormat(digits = 3)))
+
+# Rank locations by quality
+ggplot(table1, aes(x = fct_reorder(Loc, mean), y = mean)) +
+  geom_point(size = 3) +
+  theme(text = element_text(size = 20)) +
+  labs(x = "Location", y = "yield (ton/ha)")
+```
+
+
+b) Make a boxplot to assess heterogeneity of genetic variance among environments. Why is this important to assess?
+
+```{r, eval=FALSE}
+# make a boxplot
+ggplot(triticale, aes(x = Loc, y = yield)) + 
+  geom_boxplot() +
+  theme(text = element_text(size = 20)) +
+  labs(y = "yield (ton/ha)", x = "Location")
+```
+
+c) Check correlations between environments. What correlation tells about GxE?
+
+```{r, eval=FALSE}
+# make scatterplot matrix
+gxeWide <- select(triticale, Geno, Loc, yield) |>
+  pivot_wider(names_from = "Loc", values_from = "yield")
+
+# Plot the correlation matrix
+ggcorr(gxeWide[, -1], nbreaks = 5, label = TRUE)
+```
+
+```{r, eval=FALSE}
+ggpairs(gxeWide[, -1])
+```
+
+
+d) What is your expectation in terms of the potential GxE in this data set?
+
+## The Finlay-Wilkinson model
+
+
+The FW model can be written in the alternative way of Equation (5), where the environmental main effect Ej is explicitly included, 
+and the slope parameter βi has mean zero (so the average adaptability β = 0).
+
+a) Use the provided script to calculate and plot the environmental index versus the average per location. What do you see in the plot? Which location can be called as ”an average” location?
+
+
+```{r, eval=FALSE}
+Eindex <- triticale |> group_by(Loc) |> summarise(env_average = mean(yield), .groups = "drop") |>
+  mutate(Env_index = env_average - mean(env_average), across(is.numeric, round, digits = 3)) |>
+  arrange(Env_index)
+
+ggplot(Eindex, aes(x = Env_index, y = env_average)) +
+  geom_point(size = 2) +
+  geom_text_repel(aes(label = Loc)) +
+  labs(x = "Environmental index", y = "mean yield")
+```
+
+
+b)	Plot the genotypic performance versus the environmental index adding the fitted reaction norm line. What do you see? Are there differences between the genotypes (consider complete versus substituted types)?
+
+```{r, eval=FALSE}
+# add the environmental index to the data set
+triticale <- left_join(triticale, Eindex, by = "Loc")
+
+# Plot the yield versus environmental index per Genotype. A simple regression model per genotype
+# is fitted to parameterize the Finlay-Wilkinson model
+# Here we do the fit with the geom_smooth() aesthetics for plotting but below we use the lm() function for that
+ggplot(triticale, aes(x = Env_index, y = yield, colour = Type)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE) +
+  theme(text = element_text(size = 20), legend.position = "bottom") +
+  labs(x = "Environmental index", y = "yield (ton/ha)") +
+  facet_wrap(~Geno)
+```
+
+c)	Inspecting the plots is an informal way to assess whether the model describes GxE satisfactorily. A more formal way is to fit the statistical model and evaluate the ANOVA table. Fit the model and conclude from the ANOVA table. 
+
+```{r, eval=FALSE}
+# First fit the additive model to see the total GxE
+m0 <- lm(yield ~ Geno + Loc, data = triticale)
+anova(m0)
+
+# First fit the FW model to assess how much GxE it explains
+m1 <- lm(yield ~ Geno + Loc + Geno:Env_index, data = triticale)
+anova(m1)
+```
+
+* Does the FW model significantly explain GxE?
+* How much of the total GxE has been explained by the FW model? Express it as percentage of the total GxE.
+* Why is it important to assess how much GxE is explained and not only significance?
+
+e)	Obtain the parameter estimates for the genotypes and answer the questions below.
+
+```{r, eval=FALSE}
+# this is to obtain the estimate of the genotype-specific intercepts and slopes
+m1b <- lm(yield ~ -1 + Geno + Geno:Env_index, data = triticale)
+
+# Bring the FW parameters into a table
+FWparam0 <- as_tibble(coef(summary(m1b)), rownames = "Term") |>
+  separate_wider_delim(Term, delim = ":", names = c("a", "b"), 
+                       too_few = "align_start") |>
+  mutate(Geno = str_replace(a, "Geno", ""),
+         Param = ifelse(is.na(b), "Intercept", "Slope"),
+         Estimate = round(Estimate, digits = 3)) |>
+  select(Geno, Param, Estimate)
+
+# add the residuals to the data to calculate Eberthart and Russel stability
+triticale <- triticale %>% mutate(fit = fitted(m1), res = residuals(m1))
+ERstab <- triticale |> group_by(Geno) |> 
+  summarise(Estimate = var(res), .groups = "drop") |>
+  mutate(Param = "ERstab")
+
+FWparam <- bind_rows(FWparam0, ERstab) |>
+  pivot_wider(names_from = Param, values_from = Estimate)
+
+reactable(FWparam,
+          columns = list(
+            Geno = colDef("Genotype", width = 120)),
+          bordered = TRUE, highlight = TRUE, defaultPageSize = 20,
+          defaultColDef = colDef(width = 100, format = colFormat(digits = 3)))
+```
+
+
+
+* Describe the performance of genotype C\_1, in terms of general adaptation and adaptability (below-average, average, above average).
+
+* Identify the most and the least adaptable genotypes according to this model.
+
+* Describe the relative performance of genotypes C\_4 and S\_1 based on their FW parameter estimates. Which of the two would be better suited for a high quality environment? Explain.
+
+* What is your impression of the general adaptation and adaptability of complete (’C’) versus substituted (’S’) genotypes?
+
+
+## The AMMI model
+
+It might be a bit cumbersome to go step by step to fit an AMMI model, so to simplify the practical here a small function to combine all steps (don't take as a great example of how to write a function!). Run the function code so you make it available for your practical.
+
+
+```{r, eval=FALSE}
+# Function to fit the AMMI model in a balanced data set
+ammi <- function(dat, geno, env, trait){
+  d0 <- dplyr::select(dat, {{geno}}, {{env}}, {{trait}})
+  col_geno <- names(dplyr::select(d0, {{geno}}))
+  col_env <- names(dplyr::select(d0, {{env}}))
+  col_trait <- names(dplyr::select(d0, {{trait}}))
+  nG <- nlevels(d0[[col_geno]])
+  nE <- nlevels(d0[[col_env]])
+  labG <- levels(d0[[col_geno]])
+  labE <- levels(d0[[col_env]])
+  
+  # First fit an additive model and save the residuals
+  fmla <- formula(str_c(col_trait, " ~ ", col_geno, " + ", col_env))
+  m1 <- lm(fmla, data = d0)
+  
+  # Get the residuals and perform a svd of the matrix of residuals
+  d0$res <- residuals(m1)
+  tmp <- formula(str_c("res ~ ", col_env))
+  forammi <- unstack(d0, form = tmp)
+  ammi <- svd(forammi)
+
+  # Need to add the SS explained by the first 2 axes in the original ANOVA table
+  A <- anova(m1)
+  A[4:5,1] <- (nG - 1) + (nE - 1) - (2 * (1:2) - 1)
+  A[4:5,2] <- ammi$d[1:2]^2
+  A[4:5,3] <- A[4:5, 2] / A[4:5, 1]
+  A[6,1] <- A[3, 1] - sum(A[4:5, 1])
+  A[6,2] <- A[3, 2] - sum(A[4:5, 2])
+  A[6,3] <- A[6, 2] / A[6, 1]
+  A[4:5,4] <- A[4:5, 3] / A[6, 3]
+  A[4:5,5] <- pf(A[4:5, 4], df1 = A[4:5, 1], df2 = A[6, 1], lower.tail = FALSE)
+  rownames(A) <- c("Genotype", "Environment", "Interaction","IPCA1",
+                   "IPCA2","Residual")
+  
+  # Obtain fitted values from the AMMI model
+  # first the fit from the additive part
+  fit1 <- fitted.values(m1)
+  
+  # Then the fit from the multiplicate component
+  D <- diag(ammi$d)
+  tmp <- ammi$u[,1:2] %*% D[1:2,1:2] %*% t(ammi$v[,1:2])
+  fit2 <- as.vector(tmp)
+  
+  ammi_fit <- fit1+fit2
+  d0$ammi_fit <- ammi_fit
+  
+  # Obtain rankings based on fitted values
+  tmp <- formula(str_c("ammi_fit ~ ", col_env))
+  fita <- unstack(d0, form = tmp)
+  dimnames(fita) <- list(labG, labE)   
+  rank <- matrix(nrow = nG, ncol = nE, dimnames = list(labG, labE))
+  
+  for (i in 1:nE) {
+    rank[, i] <- abs(rank(fita[, i]) - (nG + 1))
+  }
+  
+  # Collect all main outputs
+  return(list(ANOVA = A, fitted = ammi_fit, ranking = rank))
+}
+```
+
+
+Fit the model with the provide and answer the following questions:
+
+```{r, eval=FALSE}
+out <- ammi(triticale, geno = Geno, env = Loc, trait = yield)
+names(out)
+```
+
+f)	What can you conclude from the inspecting of the ANOVA table?
+
+```{r, eval=FALSE}
+out$ANOVA
+```
+
+g)	How much of the total GxE is explained by the first two principal components? Express it in terms of percentage of the total GxE.
+
+h)	How is the performance of this model in comparison with the FW model?
+
+Produce an AMMI biplot with the provided script. In the biplot, both genotypes and environments are displayed in the graph based on their corresponding scores. Environments are shown as vectors (blue arrows), and genotypes by their labels (in green).
+
+```{r, eval=FALSE}
+# this is to generate an AMMI biplot
+# We need to put the data in a matrix to use the
+# GGEBiplot package
+tritWide <- triticale |> select(Geno, Loc, yield) |>
+  pivot_wider(names_from = Loc, values_from = yield)
+
+tdata <- select(tritWide, -Geno) |> as.matrix()
+rownames(tdata) <- tritWide$Geno
+toplotAMMI <- GGEModel(tdata, centering = "double", scaling = "none")
+GGEPlot(toplotAMMI, titles = FALSE, footnote = FALSE)
+```
+
+i)	Do you recognize patterns of distribution of the genotypes in the biplot?
+
+j)	Based on what you observe in the biplot describe the type of interaction (positive/negative) between Complete genotypes and Coruna (C) and Orense (OR). How about the interaction with Sevilla (SE1 and SE2) and Lleida (LL)?
+
+k)	Is a higher positive interaction (relative better adaptation) necessarily indicative of a higher performance of the genotype in that environment? Explain why or why not.
+
+## The GGE model
+
+Obtain a GGE biplot and answer the following:
+
+```{r, eval=FALSE}
+# Make a GGE biplot
+toplotGGE <- GGEModel(tdata, centering = "tester", scaling = "none")
+GGEPlot(toplotGGE, titles = FALSE, footnote = FALSE)
+```
+
+l)	What is your conclusion with respect to the general performance of complete and substituted lines based on what you observe in the GGE biplot?
+
+m)	Recall that the angle between environmental vectors is associated with the correlation between the environments, how would you describe the correlation between C and OR and between OR and SE2. Check with the values in the correlation matrix you calculated before.
+
+n) In contrast to AMMI biplot, genotypic performance is reflected in the GGE biplot, so the plot allows to identify potential good fits. Which genotypes are suggested by the biplot as good fits for C, SE2 and for SA?
+
+The fact that performance is reflected in the GGE biplot has motivated its use to structure environments based on which are the best performing genotypes (”which-won-where”). We can enrich the biplot to better visualize the grouping of environments:
+
+```{r, eval=FALSE}
+# Which-won-where
+GGEPlot(toplotGGE, titles = FALSE, footnote = FALSE, type = 6)
+```
+
+m) Which grouping of sites is suggested by the plot?
+
+## Stability analysis
+
+The following function helps calculating different types of stability parameters. Use the function with the triticale data set and answer the following questions:
+
+
+```{r, eval=FALSE}
+# Short function to calculate different types of stabilities
+stability <- function(dat, geno, env, trait){
+  
+  d0 <- dplyr::select(dat, {{geno}}, {{env}}, {{trait}})
+  col_geno <- names(dplyr::select(d0, {{geno}}))
+  col_env <- names(dplyr::select(d0, {{env}}))
+  col_trait <- names(dplyr::select(d0, {{trait}}))
+  # keep number of genotypes and environments
+  nG <- nlevels(d0[[col_geno]])
+  nE <- nlevels(d0[[col_env]])
+  labG <- levels(d0[[col_geno]])
+  labE <- levels(d0[[col_env]])
+  
+  # Statitic stability
+  Static <- d0 |> group_by({{geno}}) |> 
+    summarise(ybar = mean({{trait}}, na.rm = TRUE),
+      stab1 = var({{trait}}, na.rm = TRUE), .groups = "drop")
+
+  # Wricke ecovalence
+  Wricke <- matrix(nrow=nG, ncol=1, dimnames = list(labG,"Wricke stab"))
+  
+  # First fit an additive model and save the residuals
+  fmla <- formula(str_c(col_trait, " ~ ", col_geno, " + ", col_env))
+  m1 <- lm(fmla, data = d0)
+  # Sum of squares per genotype
+  d0$res <- m1$res
+  Wricke <- d0 |> group_by(Geno) |> 
+    summarise(Wricke = sum(res^2), .groups = "drop")
+
+  # Superiority
+  Superiority <- triticale |> group_by(Loc) |>
+    mutate(aux = (yield - max(yield))^2) |> group_by(Geno) |> 
+    summarise(SupIndex = sum(aux) / (2 * nE), .groups = "drop")
+  
+  return(list(Static = Static, Wricke = Wricke, Superiority = Superiority))
+}
+```
+
+
+n) **Static stability (type 1).** The calculation of static stability is simply calculating the variances per genotype across all environments. It is also useful to calculate the average performance. Plot the results and answer the following:
+
+* What are your main conclusions from what you observe in the plot? 
+* Do you notice a relationship between performance a stability?
+* Looking at these results, if you would need to select one genotype, which one would be your choice?
+
+o) **Dynamic stability (type 2).** Estimation of Wricke’s ecovalance (Wricke 1962; 1964) is not very much complicated but it does require some steps. Essentially we need to fit an additive model (no interaction), and then calculate residual sums of squares per genotype. With the results answer the following:
+
+* What are you conclusions from the results?
+* Are your findings in line with your previous ones? If not, how would you explain the differences?
+iii)	If you base your decision on the Wricke’s ecovalences, which genotype(s) would you prefer?
+
+p) **Type 1, type 2, and type 3 stability.** When we fitted the Finlay-Wilkinson model we obtained a number of parameters associated with stability. With those results and some plots answer the following:
+
+* Looking at the plot of the slope parameter, which of the genotypes you would describe as the most stable from a static point of view (type 1 stability)?
+* Which one as the most stable genotype from a dynamic point of view (type 2 stability)?
+* The FW model can give a third measure of stability. A stable genotypes is that one that is well represented by the regression line, which will reflect in a low Mean Square deviation from the line. This is type 3 stability as defined by Eberhart and Russell (1966). Which is the most stable genotype from a type 3 stability stand?
+* Make a plot to show all the FW parameters (intercept, slope and deviations from the line) together in the same plot. What are your main conclusions?
+
+q) **Superiority measure.** With the provided script obtain the Lin and Binns cultivar superiority and answer the following:
+
+* What is your general conclusion from the plot (for example the performance of complete versus substituted lines)?
+* If you would like to identify potentially interesting genotypes, which ones would have your preference?
+* Are your conclusions in line with previous observations?

@@ -1,0 +1,249 @@
+# AMMI and GGE models
+
+## The AMMI model
+
+The name of the model stands for **A**dditive **M**ain effect and **M**ultiplicative **I**nteraction (AMMI).
+The model is the combination of an additive term that takes care of the main effects of genotypes and environments, and a multiplicative term that takes care of the genotype by environment interaction effects. We call a multiplicative term because results from the product of two parameters, one genotypic and one environmental. 
+
+$$\underline{y}_{ijk} = \mu + \color{red}{G_i} + \color{green}{E_j} + \sum_{k \in K}\color{red}{\beta_{ik}}\color{green}{E_{jk}} + \underline{\epsilon}_{ijk}$$
+
+
+On purpose the genotypic and environmental parameters are called $\beta$ and $E$ to make a connection with the Finlay Wilkinson model that we discussed previously. The difference now is that while the Finlay-Wilkinson model allows for just one environmental index, with the AMMI model we will be able to extend it by allowing more than one environmental index. The AMMI model also has in common with the Finlay-Wilkinson model that it does not use explicit environmental information, so the environments are characterized by some index obtained again through the eyes of the genotypes themselves. 
+
+## Model fit
+
+In practice, fitting the AMMI model involves two steps. First we fit an additive model with a genotypic and environmental main effect and we obtain the residuals from that model which we call $\hat{GE}_{ij}$.
+
+```{r}
+m0 <- lm(yield ~ Geno + Env, data = maize)
+# store residuals from additive model
+maize <- mutate(maize, GE_hat = residuals(m0))
+# make a GE residual matrix
+GEres <- unstack(maize, form = GE_hat ~ Env)
+head(GEres)
+```
+
+In the second step we perform a singular value decomposition of the residual $\hat{GE}_{ij}$ matrix. 
+
+```{r}
+out <- svd(GEres)
+```
+
+Without going into much of the details essentially what we do is a principal components analysis to obtain a low-rank approximation of that residual $\hat{GE}_{ij}$ matrix. Principal components are linear combinations of the information in the different environments that maximizes the explained variation. So the first principal component is the one that explains most of the GxE, the second component will be the second best, and so on. In the end we obtain $\hat{GE}_{ij}^*$ matrix which is low-rank approximation of the original $\hat{GE}_{ij}$ matrix. For example with two principal components: 
+
+$$\hat{GE}_{ij}^* = \lambda_1 \color{red}{\beta_{i1}}\color{green}{E_{j1}} + 
+ \lambda_1\color{red}{\beta_{i2}}\color{green}{E_{j2}}$$
+
+The parameters in red represent genotypic sensitivities and those in green represent the environmental index value.
+
+## Example maize data
+
+```{r, include=FALSE}
+# Need to add the SS explained by the first 2 axes in the original ANOVA table
+A <- anova(m0)
+labG <- unique(maize$Geno)
+labE <- unique(maize$Env)
+nG <- length(labG)
+nE <- length(labE)
+  
+A[4:5,1] <- (nG - 1) + (nE - 1) - (2 * (1:2) - 1)
+A[4:5,2] <- out$d[1:2]^2
+A[4:5,3] <- A[4:5, 2] / A[4:5, 1]
+A[6,1] <- A[3, 1] - sum(A[4:5, 1])
+A[6,2] <- A[3, 2] - sum(A[4:5, 2])
+A[6,3] <- A[6, 2] / A[6, 1]
+A[4:5,4] <- A[4:5, 3] / A[6, 3]
+A[4:5,5] <- pf(A[4:5, 4], df1 = A[4:5, 1], df2 = A[6, 1], lower.tail = FALSE)
+rownames(A) <- c("Genotype", "Environment", "Interaction","IPCA1",
+                   "IPCA2","Residual")
+```
+
+After fitting the AMMI model we can generate the following ANOVA table:
+
+```{r, echo=FALSE}
+A
+```
+
+In the resulting ANOVA table we see that the residual from the additive model is 813 and is shown in the row called “Interaction”. We then partition that variation in a part explained by the first principal component indicated by IPCA1, and a part explained by the second principal component called IPCA2. This is an AMMI-2 model because we allow for two components. However, we could allow more components, the maximum defined by the total number of environments. 
+There is a residual that is the part that is not yet explained. As you can see in the table, we can 
+use an F-test to assess the significance of the contribution of a particular AMMI axis. In this case 
+highly significant for both.
+
+Same as we did with the Finlay-Wilkinson model we can conclude that the AMMI-2 model explains about 55% of the original GxE: $\frac{242.3 + 172.8}{813.2} \times 100 = 55\%$. In this sense the AMMI model performs better than the Finlay-Wilkinson model for this data.
+
+
+## Biplots
+
+A nice feature of the AMMI model, is that we can produce so called biplots that are a powerful 
+diagnostic tool to identify patterns of GxE. Below the AMMI-2 biplot for our example maize data set. Before going into the interpretation of the plot itself here some basic explanation of this type of graph. 
+
+In biplots, both genotypes and environments are plotted together in the same graph which in the plot here are shown in green and blue respectively. Their coordinates are defined by the genotypic sensitivities and the environmental scores respectively. 
+
+The biplot here shows the principal component 1 in the horizontal axis which explains 30% of the total variation and principal component 2 in the vertical axis which explains 21%. In contrast to classical scatter plots, the origin of the plot is not where the X and Y axes meet but is in the center of the graph which is highlighted by the black lines. The centre defines the zero, which in our example we can interpret as no GxE. Therefore, the farther away a genotype or a environment is the more they contribute to the variation. In this plot the environments are drawn as vectors departing from the centre. The genotypes could also be drawn as vectors but in this case we have omitted that to make the plot more readable.
+
+```{r, out.width="100%", fig.align='center', echo=FALSE}
+# this is to generate an AMMI biplot
+# We need to put the data in a matrix to use the
+# GGEBiplot package
+maizeWide <- select(maize, Env, Geno, yield) |> 
+  pivot_wider(names_from = Env, values_from = yield)
+
+tdata <- select(maizeWide, -Geno) |> as.matrix()
+rownames(tdata) <- maizeWide$Geno
+toplotAMMI <- GGEModel(tdata, centering = "double", scaling = "none")
+GGEPlot(toplotAMMI, titles = FALSE, footnote = FALSE,
+        textGen = element_text(family = "", face = 1, color = "forestgreen", size = 3, hjust
+    = 0, vjust = 0, angle = 0),
+    textEnv = element_text(family = "", face = 1, color = "blue", size = 4, hjust = 0,
+    vjust = 0, angle = 0))
+```
+
+When we focus on the environments, we see that the vectors for NS92a and HN96b stand out as large contributors to the GxE since their vectors are longer. The angle between the vectors can be associated with the correlation between environments. A right angle as the one shown between NS92a and HN96b points to a low correlation between these two environments and so to a high GxE between them. The smaller the angle, the higher the correlation 
+between the environments, and so the lower GxE is between those environments. When the angle is larger than 90 degrees, then it points to negative correlations and so larger GxE between those environments. So, based on this plot, we can immediately point to groups of environments that seems to show a similar GxE pattern.
+
+When we move to the genotypes, we can look at similar things. First we can identify genotypes that seems to show a large GxE, and we can identify with which environment that interaction is important. We do so by projecting a genotype on a particular environmental axis. Take for example genotype G009 in the lower left quadrant. That genotype shows a positive interaction with environment NS92a because it project on the vector above the origin (remember the origin is in the center of the plot). However, if we project the same genotype on the vector for the environment SS92a (in the upper right quadrant) then we see that projects below the origin, and so we expect a negative interaction of this genotype in this environment.
+
+When interpreting the results from the AMMI model we should not forget that the model consists of the two parts, the additive and the multiplicative. When we interpret biplots we are focusing on the multiplicative part and is very helpful to understand the patterns of the GxE. However, that is different than the performance of the genotypes. A genotype can have a large a positive interaction effect in a particular environment but that does not make that genotype automatically the best performer in that environment.
+
+## AMMI and genotypic performance
+
+
+```{r, include=FALSE}
+# Obtain fitted values from the AMMI model
+# first the fit from the additive part
+fit1 <- fitted.values(m1)
+# Then the fit from the multiplicative component
+D <- diag(out$d)
+tmp <- out$u[,1:2] %*% D[1:2,1:2] %*% t(out$v[,1:2])
+fit2 <- as.vector(tmp)
+maize <- mutate(maize, ammi_fit = fit1 + fit2)
+```
+
+If we want to conclude on performance of the genotypes we cannot do it by inspecting the AMMI biplot, but we need to go back an obtain fitted values for this model. That is done by including the main effects and 
+the interactions:
+
+$$\hat{y}_{ijk} = \mu + \color{red}{G_i} + \color{green}{E_j} + \sum_{k \in K}\lambda_k\color{red}{u_{ik}}\color{green}{\nu_{jk}}$$
+
+The table below shows the fitted values from the AMMI model for all genotype and environment combinations. The table is sorted by the ranking in the low quality environment LN96a and shows that G041 is the top genotype. You can go back to the biplot and find that indeed that genotype had a positive interaction with that environment. However, that is not necessarily the case always as somewhat lower interaction effects can be compensated by a larger genotypic main effect. You can explore this by generating rankings based on the other environments (just click on the corresponding column) and compare the expected interaction on how far top in the ranking those gentoypes are.
+
+```{r, echo=FALSE}
+tab1 <- select(maize, Env, Geno, ammi_fit) |>
+  pivot_wider(names_from = Env, values_from = ammi_fit)
+reactable(tab1,
+          columns = list(
+            Geno = colDef("Genotype", width = 120),
+            LN96a = colDef(defaultSortOrder = "desc")),
+          bordered = TRUE, highlight = TRUE, defaultPageSize = 10,
+          defaultSorted = c("LN96a"), 
+          defaultColDef = colDef(width = 80, format = colFormat(digits = 3)))
+```
+
+
+A possible use of the rakings could be to group environments by comparing the set of superior genotypes. For example here we see the best four genotypes in each of the environments. This information could be used to group environments 
+into so called mega-environments. These mega-environments can define structure within the TPE or if very different an 
+option could be to define two new TPE one for each mega-environment. Let me say that the definition of mega-environment 
+would need much more than just a grouping based on a AMMI fit, like more formal testing using advanced mixed models. 
+However, this can be used as additional information at the moment of characterizing the structure of the environments.
+
+
+## GGE model
+
+The GGE model was proposed as a way to leverage the convenience of biplots to display genotypic performance. The GGE model is a variation of the AMMI model in which the multiplicative part of the model includes also the genotypic main effect. In that way, the multiplicative parameters explain both the genetic main effect and the interaction (and so the name GGE).
+
+The model becomes:
+
+$$\underline{y}_{ijk} = \mu + \color{green}{E_j} + \sum_{k \in K}\color{red}{\beta_{ik}}\color{green}{E_{jk}} + \underline{\epsilon}_{ijk}$$
+
+This model means that what it is subject to a singular value decomposition is a residual from a model that only includes the environmental main effect, and so we obtain a lower-rank approximation of the genotypic performance:
+
+$$\hat{GGE}_{ij}^* = \lambda_1 \color{red}{\beta_{i1}}\color{green}{E_{j1}} + 
+ \lambda_1\color{red}{\beta_{i2}}\color{green}{E_{j2}}$$
+
+This makes it attractive because we can construct biplots that show genotypic performance and not only GxE. The biplot can then help in identifying patterns of genotypic performance ("which-won-where") that is of course always interesting from a plant breeding point of view.
+
+## GGE biplot
+
+Similarly as we discussed with the AMMI biplot, the GGE biplot include both genotypes and environments, and the coordinates in the plot are defined by the genotypic and environmental scores, shown in green and blue respectively. Typically a two-dimensional GGE biplot is constructed as working with more axes is difficult. Environments are shown as blue vectors and genotypes in green. All of them depart from the origin indicated by the interception of the black lines and corresponds to the average performance. 
+
+
+```{r, out.width="100%", fig.align='center', echo=FALSE}
+# Make a GGE biplot
+toplotGGE <- GGEModel(tdata, centering = "tester", scaling = "none")
+
+GGEPlot(toplotGGE, titles = FALSE, footnote = FALSE,
+        textGen = element_text(family = "", face = 1, color = "forestgreen", size = 3, hjust
+    = 0, vjust = 0, angle = 0),
+    textEnv = element_text(family = "", face = 1, color = "blue", size = 4, hjust = 0,
+    vjust = 0, angle = 0))
+```
+
+First observation in this plot is that the main axis explains 52% of the total variation in G+GE, and the second only 14%. With the same data the first two axes of the AMMI model were more balanced (30% and 21%). Again this reminds us about the important difference between these two models and how to interpret the results. In the GGE model the first principal component tends to be dominated by the genotypic main effect and that is explaining why now the importance of the first axis has increased. This is also the reason why all the environmental vectors are pointing to one direction (the sign of the axis is irrelevant), so environments and genotypes with high performance are on the left-hand side of the plot. 
+
+### Characterization of environments {-}
+
+Moving to the environments, we see the high performing environments with longer vectors. Because the genetic main effect is included in this plot, the length of the vector for a particular environment can be interpreted as proportional to the amount of genetic variation in that particular environment. For example NS92a stands out as an environment with a high genetic variation, and that is indeed consistent with for example the boxplot we made before that shows NS92a with the widest range of variation. On the other hand, we see that the shortest vectors corresponds to the low nitrogen environments, LN96a and LN96b. This again is reflected by the boxplots.
+
+We can also interpret the angle between the environment vectors in terms of the genetic correlations between the environments. In this case NS92a seems to be less correlated with all the rest.
+
+```{r, echo=FALSE, out.width="60%", fig.align="center"}
+ggplot(maize, aes(x = Env, y = yield)) +
+  geom_boxplot() +
+  labs(x = "Environment")
+```
+
+### Characterization of genotypes {-}
+
+Moving to the genotypes, the projection of a genotype on a particular environmental vector approximates the relative performance in that particular environment. In that way we can identify whether a genotype does well or not in a particular environment. For example, genotype G103 in the lower left quadrant shows a relatively good performance in NS92a since the projection on that axis falls above the origin. It is probably about the best performer in that environment. On the contrary, the same genotype projects below the origin on SS94a, which suggest that G103 is not a good match for this environment.
+
+Looking at the graph, other genotypes that performed relatively well are those that outstand in the plot, for example G028, G045, G019, G055, etc.
+
+
+### Who-won-where {-}
+
+One use of the information of the top performing genotypes ("who-won-where") is to classify the environments in groups, pooling those environments that share the same winning genotype. There are some appealing features of the GGE biplots to do that that we see here in a bit more detail.
+
+To start we make a new biplot that is the same as the one before but enriched with some additional auxiliary features to facilitate the interpretation towards classifying environments. The black lines defines a polygon that connects the genotypes that were extreme in their performance (either high or low). The red dotted lines split the plot into "sectors" that results from cutting the polygon sides perpendicularly.
+
+
+```{r, out.width="100%", fig.align='center', echo=FALSE, warning=FALSE}
+# Make a GGE biplot
+toplotGGE <- GGEModel(tdata, centering = "tester", scaling = "none")
+
+GGEPlot(toplotGGE, titles = FALSE, footnote = FALSE, type = 6,
+        textGen = element_text(family = "", face = 1, color = "forestgreen", size = 3, hjust
+    = 0, vjust = 0, angle = 0),
+    textEnv = element_text(family = "", face = 1, color = "blue", size = 4, hjust = 0,
+    vjust = 0, angle = 0))
+```
+
+Within each sector there is a common winning genotype that is shown with in bold font. Therefore, if we are 
+willing to accept to use the fitted value from this model, and that we use as criterion to group environments that they share the same best genotype, the sectors define the mega-environments. In our example, there are two sectors with environments in it, so we will end with two mega-environments:
+
+* the one with G019 as the winner and that includes NS92a, IS92a and HN96a
+* the one with G028 as the winner that includes SS92a, SS94a, IS94a and the rest of the environments
+
+Because of the use of a graphical display, this approach is appealing and in general quite popular. However, we should bring some word of caution here. First we should realize that the multiplicative part of the GGE model accounts for both the main effect and GxE and in general that part of the variation tends to be captured by the first axis. As we said before that is a reason why in most cases the proportion of the explained variation of the first axis tends to be much larger than that explained by the second axis. This means that the information about interaction is reduced to the second axis, which means would be similar to an AMMI model with just one axis. If we consider this, and we compare fitted values from an AMMI-2 model with that of a GGE model, the AMMI model will contain more information. So, although graphically GGE biplots seem to be attractive, we should proceed with caution when defining mega-environments. In any case, both the AMMI and GGE models are useful and complementary tools but the definition of mega-environments will probably require more than just the information from these two models. For example, will require the testing of the subdivisions using suitable mixed models and various other criteria.
+
+## Summary AMMI and GGE
+
+The main concluding remarks are:
+
+* The AMMI model can be regarded as an extension of a Finlay-Wilkinson model with more axes to capture and represent patterns of GxE variation. 
+
+* The AMMI uses a principal component analysis to define optimal environmental indexes to be used as explantory variables. 
+
+* The parameters of the AMMI model can be displayed in biplots that are useful diagnostics plot of patterns of GxE, regarding both the genotypes and the environments.
+
+* The GGE model is closely related with the AMMI model, the difference being that this model includes the genotypic main effect as part of the multiplicative term of the model. 
+
+* Because of including main effects in the multiplicate part, genotypic performance can be visualized in biplots, showing patterns of performance, genetic variation within environments and covariation between environments. 
+
+* GGE biplots can be useful as complementary tool to identify good performers in different environments and with that also classify environments into mega-environments.
+
+
+
+
+
+
+
+

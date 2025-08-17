@@ -1,0 +1,76 @@
+# Note on stability
+
+So far we have been focusing on the expectation of the performance of a group of genotypes over a range of environments that defines our TPE. Another important aspect that relates with the performance is that on consistency. A genotype can be a good performer because on average achieves certain level of for example yield. That by itself is a good feature and probably a necessary one at the moment of deciding whether to select a genotype as a potential interesting variety. 
+
+However, in addition to the **average peformance**, another aspect that is very important is **consistency of performance**. Two genotypes can show a similar level of average performance but with different levels of consistency. While one genotype behaves consistently good around its mean, another genotype might perform much less consistent, for example with very bad and very good years with some good average. 
+
+For example in the plot below, which genotype would you prefer, the red or the blue? The dotted lines are the corresponding genotype's averages and the thick black line represents the minimum yield for the crop to be economically viable.
+
+
+```{r, echo=FALSE}
+ggplot(data = tibble(x = c(2, 14)), aes(x)) +
+  stat_function(fun = dnorm, n = 101, args = list(mean = 9, sd = 2),
+                colour = "red") +
+  stat_function(fun = dnorm, n = 101, args = list(mean = 8.5, sd = 0.9),
+                colour = "blue") +
+  geom_vline(xintercept = c(9, 8.5), colour = c("red", "blue"), linetype = "dashed") +
+  geom_vline(xintercept = 7, colour = "black", size = 1) +
+  labs(x = "yield (ton/ha)", y = "density")
+  
+```
+
+The concept of stability links with consistency or low variation around some expected performance, which in statistics connects with the concept of variance. When we think in terms of stability, we think in terms of variation, around some expectation, but which expectation are we talking about? Because the concept depends on a model for the expectation, there are many ways to define stability. Here we give a quick and high level overview of it.
+
+To facilitate the discussion we group the approaches in static versus dynamic stability definitions. We also connect with the Finlay-Wilkinson model we discussed here and we finally touch on a superiority measure that tries to combine both expected performance and variance.
+
+
+## Static stability: type 1
+
+The simplest definition of stability is the **static stability**. Here we understand stability as the capacity to produce the same output across the entire set of environments. This defintion simply translates into the variation around the genotypic mean across all the environments being as small as possible. A stable genotype is one that has a low variance around that mean.
+
+The expression is shown in the slide, just the squared deviations of the observations with respect to the mean.
+
+$$s_i^2 = \frac{1}{n_e - 1} \sum(y_{ij}-\bar{y}_{i.})^2 $$
+
+$$E(s_i^2) = \sigma^2_{\mu_i} = \sigma^2_E + \sigma^2_{GE_i}$$
+
+
+This is also called “biological” stability. Note that with this type of stability we imply a stable genotype should not show plasticity. Plastic genotypes will not be stable from this point of view.
+
+
+
+## Dynamic stability: type 2
+
+Another view on stability is that called **dynamic or agronomic stability**. Here the point is that we do expect genotypes to change their performance from environment to environment, for example if they receive better conditions. So pooling that into the variation will not be very helpful as that is not the type of stability we are interested in. We do want a genotype to respond to better conditions, but the point is that we want that response to be consistent. If a genotype shows plasticity we want that response to be as much consistent as possible. 
+
+To measure that we can consider a measure of stability that includes the genotype and environment effects in the expectation. One such measure is the **Wricke’s ecovalence** that considers as a measure of stability the contribution of a particular genotype to the total GxE sum of squares (in other words, a stable genotype is the one that does not deviate too much from the additive model). 
+
+So, if we consider the expectation of a genotype performance across environments as:
+
+$$E(y_{ij}) = G_i + E_j$$
+
+the stability parameter can translate in the following:
+
+$$SS_{GE_i} = \sum (y_{ij} - \bar{y}_{.j} - \bar{y}_{i.} + \bar{y}_{..})^2$$
+
+This is nothing else than the contribution of a specific genotype to the total sums of square for GxE. If a genotype makes a higher contribution to the total GxE sums of squares, we interpret as the genotype deviating more from the average performance, and so we conclude is less stable. A genotype that behaves close the average is a stable genotype.
+
+## Finlay-Wilkison model and stability
+
+The Finlay-Wilkison model parameters can be linked to the different definitions of the stability. 
+
+For example, **static stability** can be related with a slope equal to 0, as a stable genotype should show no-plasticity.
+
+If looked from a **dynamic point** of view, then stability will be shown by those genotypes with slopes close to 1, as they react as the average (recall with the Finlay Wilkinson model a slope 1 defines the response of an average genotype). Therefore, the slope in the Finlay-Wilkinson model can also be regarded as a type 2 stability parameter.
+
+Eberhart and Russell proposed in 1966 an alternative measure, which they defined as **type 3 stability**. Their definition considers the deviations from the regression line, that is the variance around the line, as a measure of stability.
+
+## Superiority measures
+
+Stability measures do not imply performance, stability and performance can be related but are different things. We can have a stable genotype that performs bad and the other way around, a good genotype on average but that is not stable.
+
+Can we put both expected performance and stability in a single measure? This is what Lin and Binns proposed with the **superiority measure**. The basic idea is to define an index that uses the performance gap to the top performing genotype as a proxy of both performance and stability. The index is as follows:
+
+$$P_i = \frac{1}{2n_e} \sum (y_{ij} - m_j)^2$$
+
+where $m_j$ stands for the top performer in environment $j$. The smaller the value of the index the better (superior) a genotype is. If a genotype is consistently close to the top in each environment then this index will result in a small value. If a genotype is performing close to the top in general but in some environment not, then the index will increase its value. The same if the genotype is not performing close to the top in many of the environments.
