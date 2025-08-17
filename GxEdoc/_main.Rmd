@@ -1,3 +1,22 @@
+--- 
+title: "Genotype by environment interaction: adaptation, stability and resilience"
+author: "Marcos Malosetti"
+date: "`r Sys.Date()`"
+site: bookdown::bookdown_site
+documentclass: book
+bibliography: [book.bib, packages.bib]
+description: |
+  This is the base document used in the Zaragoza course 2023.
+---
+
+# The module at a glance {-}
+
+Placeholder
+
+
+
+<!--chapter:end:index.Rmd-->
+
 # Basic concepts and definitions
 
 ## Phenotype (P), genotype (G) and environment (E)
@@ -214,4 +233,140 @@ knitr::include_graphics("./GxEdoc/images/GxEsimpleDiagPlots.png")
 ```
 
 
+
+
+<!--chapter:end:01-GxEtheBasics.Rmd-->
+
+
+# MET and basic statistical models
+
+Placeholder
+
+
+## Multienvironment trials (MET)
+## Typical research questions on GxE
+## One-stage analysis for MET data
+## Two-stage analysis for MET data
+## Modelling GxE
+### Full factorial ANOVA {-}
+### Finlay Wilkinson model {-}
+### AMMI model {-}
+### GGE model {-}
+### Factorial regression model {-}
+
+<!--chapter:end:02-METandBasicModels.Rmd-->
+
+
+# Variance components models
+
+Placeholder
+
+
+## A motivating example 
+## A basic mixed model for GxE
+## Partitioning GxE
+## Design MET networks
+### The LSD as measure of precision {-}
+## Summary
+
+<!--chapter:end:03-VarianceComponentsModel.Rmd-->
+
+
+# Practical 1
+
+Placeholder
+
+
+## Description of the data set and data exploration
+## Definition of the statistical model
+## Fit the two models
+## Partition the GxE variance
+## Design of a trial network
+## Single site analysis
+
+<!--chapter:end:04-Practical-1.Rmd-->
+
+
+# Finlay-Wilkinson model
+
+Placeholder
+
+
+## Introduction
+## Example maize
+## Environmental index
+## Model fit
+## Parameter estimates
+## Summary
+
+<!--chapter:end:05-FinlayWilkinson.Rmd-->
+
+
+# AMMI and GGE models
+
+Placeholder
+
+
+## The AMMI model
+## Model fit
+## Example maize data
+## Biplots
+## AMMI and genotypic performance
+## GGE model
+## GGE biplot
+### Characterization of environments {-}
+### Characterization of genotypes {-}
+### Who-won-where {-}
+## Summary AMMI and GGE
+
+<!--chapter:end:06-AMMI_GGE.Rmd-->
+
+
+# Factorial regression models
+
+Placeholder
+
+
+## Use of explicit environmental information
+## Factrorial regression models
+## Maize example revisited
+## Modelling GxE with explicit genotypic information
+### Define genetic predictors
+### Incorporating the marker in the regression model
+## QTLxE analysis in the maize example
+### Define the QTLxE model
+### Fit the QTLxE model
+### Interpreation of QTL effects
+### Expected QTL genotype means
+## Summary factorial regression models
+
+<!--chapter:end:07-FactorialRegression.Rmd-->
+
+
+# Note on stability
+
+Placeholder
+
+
+## Static stability: type 1
+## Dynamic stability: type 2
+## Finlay-Wilkison model and stability
+## Superiority measures
+
+<!--chapter:end:08-Stability.Rmd-->
+
+
+# Practical 2
+
+Placeholder
+
+
+## Description of the data set
+## Summary statistics and plots
+## The Finlay-Wilkinson model
+## The AMMI model
+## The GGE model
+## Stability analysis
+
+<!--chapter:end:09-Practical-2.Rmd-->
 
