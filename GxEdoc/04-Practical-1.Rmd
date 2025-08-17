@@ -1,0 +1,324 @@
+# Practical 1
+
+In this computer practical we explore a number of statistical models
+that can be used to analyse METs.
+
+After completing this practical you should be able to:
+
+-   Formulate a model to partition GxE into its components (i.e.
+    genotype by location, genotype by year, etc).
+
+-   Fit a variance component model by REML (using R) and interpret the
+    output to assess the importance of GxE.
+
+-   Use variance components to evaluate the precision of a network of
+    trials.
+
+## Description of the data set and data exploration
+
+In this exercise we use yield data of durum wheat in Algeria that we
+introduced already. The data was produced by a project lead by Paolo
+Annicchiarico (Istituto Agronomico per l'Oltremare, Italy). More details
+about this work can be found in the book Genotype x Environment
+Interactions - Challenges and Opportunities for Plant Breeding and
+Cultivar Recommendations by P. Annicchiarico (2002), available from:
+<http://www.fao.org/docrep/005/Y4391E/Y4391E00.HTM>.
+
+In this practical we use a subset of 11 sites present in the two years
+(i.e. 11 sites x 2 years = 22 environments). Each of the trials were
+designed as a randomized complete block design (RCBD) with four
+replicates.
+
+```{r, echo=TRUE}
+# Read data and display tibble
+load("./data/Durum wheat Algeria.RData")
+durum
+```
+
+Before starting with analysis, it is always a good idea to plot the data
+in different ways to become familiar with the information. In addition,
+plotting is a way to develop and structure your ideas, and to establish
+and define research questions and hypotheses to be tested. So, although
+plotting is not formal data analysis, it is an important first step to
+build a good data analysis.
+
+Use the following script to generate a few plots and discuss with your
+group what do you learn form each of the plots (plots 1, 2, and 3). Feel
+free to experiment with any other plot.
+
+```{r, eval=FALSE}
+# SECTION 1.2: Plotting the data to understand structure
+ggplot(durum, aes(x = Genotype, y = yield, colour = Year)) +
+  geom_point() +
+  theme(text = element_text(size = 14), 
+        axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 0.5),
+        legend.position = "bottom", legend.title = element_blank()) +
+  labs(title = "Plot 1: raw data per location", x = element_blank()) +
+  facet_wrap(~Location)
+
+ggplot(durum, aes(x = Location, y = yield)) +
+  geom_boxplot() +
+  theme(text = element_text(size = 18)) +
+  labs(title = "Plot 2: boxplot of observations per location") +
+  facet_wrap(~Year, nrow = 2)
+
+ggplot(durum, aes(x = Genotype, y = yield)) +
+  geom_boxplot() +
+  theme(text = element_text(size = 20), 
+        axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 0.5),
+        legend.position = "bottom", legend.title = element_blank()) +
+  labs(x = element_blank()) +
+  labs(title = "Plot 3: boxplot of observations per genotype") +
+  facet_wrap(~Year, nrow = 2)
+```
+
+## Definition of the statistical model
+
+Before diving into the computer and start running scripts, it is a good
+practice to grab a piece of paper and write down the basic statistical
+models we are planning to use. This is indeed the most difficult part,
+because it requires the understanding of the statistical model we want
+to use. Running the analysis with the computer (eg: in R or any other
+computer language) is the easy part as it only involves learning how to
+translate the statistical model you want to fit in the appropriate
+script (computer language). Software comes with plenty of help and
+examples to help you with that and R is very strong in this respect
+(also because of the large community of users that increases the chances
+that someone has run into the problem you may be facing). A bit of a
+buzz word nowadays, but don't forget to check with AI in the form of
+your favorite Chatbot. However, interpreting the concrete results you
+have in front of you, that will require your own understanding of the
+problem and there the Chatbot will be less helpful...
+
+So, don't get distracted with the ins and outs of the scripts, but focus
+on making sure you do understand the statistical model behind it and how
+to interpret the results you are getting out after executing the
+scripts.
+
+1)  With the description and exploration of the data you have made so
+    far formulate an appropriate fixed effects model (ANOVA model) for
+    this data. Define every term in the model and also make explicit the
+    assumptions of the model.
+
+2)  Reformulate the model you have proposed in the previous question by
+    taking genotypes as random (i.e. move to a linear mixed model).
+    Define all terms in the model and make explicit the assumptions.
+
+## Fit the two models
+
+Use R to fit the two models you have defined and answer the following
+questions.
+
+```{r, eval=FALSE, echo=TRUE}
+model1 <- lm(yield ~ Environment / Block + Genotype + Genotype:Environment,
+             data = durum)
+
+model2 <- lmer(yield ~ Environment / Block +(1|Genotype) 
+               + (1|Genotype:Environment), data = durum)
+```
+
+1)  Fit the fixed effects model. What is your main conclusion from the
+    ANOVA table?
+2)  Can you directly read from the ANOVA table the variance components
+    for genotypes (VG), genotype by environment (VGE), and error (Ve)?
+3)  Fit the linear mixed model and give the estimates of the variance
+    components for genotypes (VG), genotype by environment (VGE), and
+    error (Ve).
+4)  Compare the relative values of the different variance components. Is
+    GxE important in this data?
+5)  What is the expected genetic correlation between the environments?
+
+## Partition the GxE variance
+
+In this part we will decompose the environment into its main components:
+the locations and the years. Update the model in R and fit it to answer
+the following questions:
+
+```{r, echo=TRUE, eval=FALSE}
+model3 <- lmer(yield ~ Location * Year /Block + (1|Genotype) + 
+               (1|Genotype:Location) + (1|Genotype:Year) +
+               (1|Genotype:Location:Year), data = durum)
+```
+
+1)  Give the estimates of all variance components: VG, VGL, VGY, VGLY,
+    and Ve.
+2)  Check that the sum of the interaction variance components adds up
+    (approximately) to the original GxE variance you obtained in the
+    previous analysis. Does it make sense?
+3)  Compare the relative importance of the different sources of GxE.
+    What is your conclusion with respect to the importance of
+    "repeatable" versus "non repeatable" GxE in this data.
+4)  Use the table below (extracted from Atlin et al. 2000, Crop Science
+    40:713) to compare the importance of the variance components in this
+    data with those of different studies.
+
+## Design of a trial network
+
+The partitioning of the sources of GxE can also be used to make
+decisions regarding the evaluation network (MET). With the estimated GxE
+variance components, we can estimate the expected precision of the
+network as a function of the number of locations, years, and
+replications within locations.
+
+Fit a model like the one in the previous section but with the genotypic
+main effect in the fixed part (this will allow to obtain a BLUE per
+genotype).
+
+```{r, echo=TRUE, eval=FALSE}
+model4 <- lmer(yield ~ Location * Year/Block + Genotype + 
+               + (1|Genotype:Location) + (1|Genotype:Year) 
+               + (1|Genotype:Location:Year), data = durum)
+```
+
+1)  Does the network allows to differentiate the genotypes by their
+    yield performance?
+2)  A way to assess the quality of the network is by the precision of
+    the estimated genotypic means. Get the adjusted means (BLUEs) per
+    genotype and the corresponding standard errors. What is your
+    conclusion about the precision of the estimates?
+
+```{r, echo=TRUE, eval=FALSE}
+adjmeans <- emmeans(model4, specs = "Genotype") 
+```
+
+3)  With the estimated GxE variance components and error variance, and
+    the expression of the variance of a genotypic mean calculate the
+    standard error of the mean "by hand" and compare your result with
+    the outcome from the "emmeans" function.
+
+4)  Another way to quantify the precision of the network is by the Least
+    Significant Difference (LSD). With the results and available
+    information calculate the LSD by hand and confirm your result with
+    those from R.
+
+```{r, echo=TRUE, eval=FALSE}
+pairs(adjmeans) 
+```
+
+5)  With all the results you have calculate what would be the expected
+    LSD under the following scenarios:
+
+a)  The network would include only 5 locations
+b)  The network would consist of 10 locations and 2 replications per
+    location
+c)  The nerwork would consist of just 1 year data (keeping 11 sites and
+    4 replications per site)
+
+## Single site analysis
+
+So far we have used all the raw data (plot records) in the
+multi-environment analysis (one-hit models). A simpler and pragmatic
+alternative is to perform what is called a two-stage analysis, where in
+the first stage, each individual trial is analysed separately allowing
+to estimate variance components per trial and to compute adjusted means
+per genotype, and 2) the adjusted means per trial are analysed together
+in a subsequent GxE analysis. This is what we are going to do now.
+
+In terms of the statistical models we start with a standard model for an
+RCBD design with genotypes taken as random effects to estimate genetic
+variance components and heritability, the model is:
+
+$$y_{ijk} = \mu + B_k + \underline{G}_i + \underline{e}_{ijk}$$
+
+1)  Fit the model to analyse the first trial (loc01 year1) and give the
+    estimates of the genetic and error variances. Use those variance
+    components to calculate the heritability of yield.
+
+```{r, echo=TRUE, eval=FALSE}
+# Select first environment
+d1 <- filter(durum, Environment == "loc01_year1")
+
+# fit the basic model (genotypes random)
+m1r <- lmer(yield ~ Block +(1|Genotype), data = d1)
+```
+
+2)  Fit the model again, but considering the genotype as fixed effect.
+
+```{r, echo=TRUE, eval=FALSE}
+# fit the basic model (genotypes random)
+m1f <- lm(yield ~ Block + Genotype, data = d1)
+adjmeans <- emmeans(m1f, specs = "Genotype") |> as_tibble() |> 
+  arrange(desc(emmean))
+```
+
+a)  Are there significant differences between genotypes?
+b)  Plot the genotypes ranked by yield
+c)  Which are the best genotypes in this environment?
+
+We can repeat the process for each single environment. Use the following code to do that.
+
+```{r, echo=TRUE, eval=FALSE}
+# Analysis trial by trial
+labEnv <- levels(durum$Environment)
+
+# Fit model with genotypes random to estimate variance components
+vcomp <- NULL
+adjm <- NULL
+for (i in 1:length(labEnv)){
+  dat <- filter(durum, Environment == labEnv[i])
+  
+  # fit the basic model (genotypes random)
+  m1 <- lmer(yield ~ Block +(1|Genotype), data = dat)
+  toadd <- as_tibble(VarCorr(m1)) |> mutate(Environment = labEnv[i])
+  vcomp <- bind_rows(vcomp, toadd)
+  
+  # fit the linear model (genotypes fixed)
+  m2 <- lm(yield ~ Block + Genotype, data = dat)
+  
+  toadd <- emmeans(m2, specs = "Genotype") |> as_tibble() |>
+    mutate(Environment = labEnv[i])
+  
+  adjm <- bind_rows(adjm, toadd)
+}
+
+# make a few changes in the tibble and plot results
+vcomp <- select(vcomp, Environment, grp, vcov) |> rename("Source" = "grp") |>
+  separate_wider_delim(Environment, names = c("Loc", "Year"), delim = "_",
+                       cols_remove = FALSE)
+
+# create tibble with BLUEs
+durum_blues <- adjm |> 
+  separate_wider_delim(Environment, names = c("Loc", "Year"), delim = "_",
+                                            cols_remove = FALSE) |>
+  relocate(c(Environment, Loc, Year), .before = Genotype) |>
+  mutate(across(c(Environment, Loc, Year), as.factor))
+```
+
+
+Generate a plot with the genetic and residuals variances for all locations and years. 
+
+```{r, echo=TRUE, eval=FALSE}
+ggplot(data = vcomp, aes(x = Loc, y = vcov, fill = Source)) +
+  geom_bar(stat = "identity", position = position_dodge()) +
+  theme(text = element_text(size = 20), legend.position = "bottom",
+        legend.title = element_blank()) +
+  labs(y = "Variance") +
+  facet_wrap(~Year, nrow = 2)
+```
+
+d) What do you observe in the plot? 
+e) How do you explain that even when the exact same genotypes have been tested in all the sites and years, 
+the plots do not look the same between years and locations? 
+
+A way to quantify the amount of signal (genetic variation) in comparison with the
+error is to estimate the trait heritability. Estimate the heritability per trial and plot the estimates. 
+
+```{r, echo=TRUE, eval=FALSE}
+# calculate heritability
+h2 <- vcomp |> pivot_wider(names_from = "Source", values_from = "vcov") |>
+  mutate(h2 = Genotype / (Genotype + Residual / 4))
+
+ggplot(data = h2, aes(x = Loc, y = h2)) +
+  geom_bar(stat = "identity", fill = "lightblue") +
+  theme(text = element_text(size = 20), legend.position = "bottom",
+        legend.title = element_blank()) +
+  labs(y = "heritability") +
+  facet_wrap(~Year, nrow = 2)
+```
+
+f) Are you surprised with the result?
+g) Since we are considering the same trait, how do you explain the different heritabilities? 
+f) What do the results regarding genetic variances and heritabilities suggest in terms of the 
+potential genotype by environment interaction?
+g) After your answers to the questions above, why do you think one should always be critical 
+when discussing and comparing heritability estimates from different experiments?

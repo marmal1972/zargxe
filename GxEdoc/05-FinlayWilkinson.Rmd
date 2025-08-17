@@ -1,0 +1,219 @@
+# Finlay-Wilkinson model
+
+## Introduction
+
+The model was proposed more than 50 years ago by Finlay and Wilkinson, two researchers working in barley breeding in Australia. The model is also known as joint regression model or regression on the man model. The model connects directly with the idea of reaction norms that we introduced before. A reaction norm is a functional relationship of the genotypic response to an environmental gradient. What these authors proposed was to represent that gradient by an **environmental index** that tells about the quality of the environments through "the eyes" of the genotypes. The idea simple takes the average performance of all the genotypes in a particular
+environment as a measure of environmental quality. If we imagine a good environment for example with good soils including high fertility, suitable water availability and incoming radiation we can understand that all genotypes would tend to perform well. As a result the overall average in that environment will be higher than the average performance in a different environment that is less favourable (eg: some of these factors being limiting).
+
+In a X-Y plot the concept can be represented as this, where the "average" environment is the zero in the environmental quality range (the X-axis) and the performance is in the Y-axis:
+
+```{r, echo=FALSE, fig.width=5, fig.height=4, fig.align="center"}
+d1 <- tibble(Env = str_c("Env", 1:11), Env_index = seq(-5, 5), yield = 5 + (0.9 * Env_index))
+
+ggplot(d1, aes(x = Env_index, y = yield)) +
+  geom_line(colour = "blue") +
+  labs(x = "Environmental quality", y = "Performance (eg: yield)")
+```
+
+Another interesting feature of the approach is that what we actually have is a simple regression model with its two main parameters, and **intercept** and a **slope**.
+
+A third nice feature is that the adaptability parameter can be easily interpreted with respect to the total population since the average adaptability is defined as slope equal to one, so genotypes with a slope higher 
+than one show a higher than average adaptability, and those with a slope lower than 1 a lower than average adaptability.
+
+Here we see the expression of the Finlay-Wilkinson model in a more formal way and the link with the classical two way ANOVA model.
+
+
+$$ \underline{y}_{ijk} = \mu + \color{red}{G_i} + \color{green}{E_j} + (\underline{GE}_{ij} + \underline{e}_{ijk})$$
+
+$$\underline{y}_{ijk} = \mu + \color{red}{G_i} + \color{green}{E_j} + \color{red}{\beta_i}\color{green}{E_j} + 
+  \underline{\epsilon}_{ijk}$$
+  
+  
+We see that essentially what we do is to use the environmental main effect as a regressor to model the GxE in a simple regression model. What the model is trying to do is to capture as much of the $GE_{ij}$ variation in the classical ANOVA by the genotype-specific slopes in the regression model ($\beta_i$). 
+
+
+We can conveniently reorder the equation to end up in a simple formula with two parameters:
+
+$$\underline{y}_{ijk} = \mu + \color{red}{G_i} + \color{green}{(1+} \color{red}{\beta_i} \color{green}{)E_j} +  
+  \underline{\epsilon}_{ijk}$$
+  
+$$\underline{y}_{ijk} = \color{red}{\mu_i} + \color{red}{b_i} \color{green}{E_j} + 
+  \underline{\epsilon}_{ijk}$$
+
+* $\mu_i$: the **intercept** that connects with the concept of **general performance** of a particular genotype across the entire TPE
+* $b_i$ the **slope** that links with of **adaptability** of the genotype which reflects the capacity of the genotype to react to the improvement of the environment. 
+
+
+
+## Example maize
+
+Let show the model working in a concrete example. The data is coming from maize trials run by CIMMYT in Mexico,
+run in multiple environments (different locations and management combinations).
+
+
+```{r, echo=FALSE, out.width="60%", fig.align="center"}
+knitr::include_graphics("./images/maizeMexico.jpg")
+```
+
+
+```{r, include=FALSE}
+load("./data/MET maize.RData")
+```
+
+You can visualize the data as a two-way table of means, with genotypes in the rows and environments in the columns. 
+
+```{r, echo=FALSE}
+pivot_wider(maize, names_from = Env, values_from = yield) |>
+  print(n = 10)
+```
+
+In this example the names of the environments tells something about their quality, for example LN stands for "low nitrogren", SS water stress, IS intermediate stress, HN high nitrogen and NS no stress. With those names we can start imagining a ranking of the environments, probably NS being among the best and LN or SS being in the bottom.
+
+In the next part we see how we can construct an **environmental index** to create such a ranking.
+
+## Environmental index
+
+We start by ploting the data:
+
+```{r, echo=FALSE, out.width="60%", fig.align="center"}
+ggplot(maize, aes(x = Env, y = yield)) +
+  geom_boxplot() +
+  labs(x = "Environment")
+```
+
+The boxplot shows that trend indeed, and based on this data we could clearly place each of the environments in a continuous scale from worst to best by simply using the average per environment to consturct an index. 
+
+From the expression below you can see that it is simply the average of all genotypes in the environment, and the only additional thing we do is to center around zero. In this way an environmental index = 0 is interpreted as "the average" environment.
+
+
+```{r}
+maize |> group_by(Env) |> summarise(env_average = mean(yield), .groups = "drop") |>
+  mutate(Env_index = env_average - mean(env_average), across(is.numeric, round, digits = 3)) |>
+  arrange(Env_index)
+```
+
+In the table we have sorted the environments by environmental index, the worst environments are in the top and the best in the bottom. We see that 5 out of the 8 environment are "below" the average and all those are related with some type of constrain (either low nitrogen or water stress). The best environment is indeed the NS (no-stress) environment.
+
+```{r, echo=FALSE}
+toadd <- maize |> group_by(Env) |> summarise(env_average = mean(yield), .groups = "drop") |>
+  mutate(Env_index = env_average - mean(env_average), across(is.numeric, round, digits = 3))
+
+maize <- left_join(maize, toadd, by = "Env")
+```
+
+
+
+Now, having defined the environmental index we can plot the yield of each genotype versus the environmental index and describe the response. For example in the graph we see that plot for two genotypes (G035 and G037). We see some differences. 
+
+* First we can see that while G037 does very well in the high end of the TPE with a yield of above 7.5, G035 is not getting to a yield of just 5 in the same best environment. The line shows the "reaction" pattern of the genotypes, and we see that the red line (G035) is not very steep, meaning that genotype is unable to profit from the better conditions, just the opposite of G037 with a steeper line (blue). 
+
+* Second, the relationship between the index and the response seems to be better described by the model in the case of G037 than G035. How well the line describes the data relates to how close or far the observations are from the fitted line, and looking at the plots the green dots seems to be a bit closer to the line than the red ones. Of course this is an informal assessment but when we fit the model we can actually quantify this.
+
+
+```{r, echo=FALSE, message=FALSE, out.width="80%", fig.height=4, fig.align="center"}
+toplot <- filter(maize, Geno %in% c("G035", "G037"))
+
+ggplot(toplot, aes(x = Env_index, y = yield, colour = Geno)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(x = "Environmental index") +
+  facet_wrap(~Geno)
+```
+
+## Model fit
+
+We start by fitting the two-way anova model since it is the model we want to improve on. Remember that we are working with adjusted means per environment so we cannot fit an explicit GxE term in the model, but GxE is included in the residual. Our objective is to reduce as much as possible that residual.
+
+```{r}
+m0 <- lm(yield ~ Geno + Env, data = maize)
+anova(m0)
+```
+
+From the ANOVA table we see that the residual sums of squares is 813.2, which reflects the amount of "unexplained" GxE in the data.
+
+Now we extend the model by adding a term that hopefully will capture part of that unexplained GxE by means of genotype sensitivities to the environmental index we have defined:
+
+```{r}
+# fit Finlay-Wilkinson model
+m1 <- lm(yield ~ Geno + Env + Geno:Env_index, data = maize)
+
+# add the residuals to the tibble (we will use them to estimate Eberthart & Russel stability)
+maize <- mutate(maize, fit = fitted(m1), res = residuals(m1))
+
+anova(m1)
+```
+
+In the new ANOVA table we see that the slopes (Geno:Env_index term) are very significant. We also see the change in the residual sums of squares that now has became 583.3. The difference with the original 813.2 is the part of the variation that we have captured with the slopes (sums of squares is 229.9). We can do the simple calculation to conclude that we have explained 28% of the original GxE with the Finlay-Wilkinson model ($\frac{229.9}{813.2} \times 100 = 28\%$). 
+
+The amount of the total GxE that is explained by this or other models, is important to consider because how helpful or not that model is depends on how well it captures the GxE. In general, this is not the strongest point of this model. So, before going too deep in the interpretation of the parameters of this model it is always good to check how much of the total GxE has been potentially captured. We will also see other models that in general results in a higher capacity to explain GxE, like the AMMI model.
+
+## Parameter estimates
+
+To obtain the parameter estimates of each of the genotypes it is convenient to re-fit the model so we can directly get the parameters that are easier to interpret. Each genotype will have two parameters, the intercept and the slope. The code below is an example with some manipulation of the results for easier display: 
+
+```{r}
+# this is to obtain the estimate of the genotype-specific intercepts and slopes
+m1b <- lm(yield ~ -1 + Geno + Geno:Env_index, data = maize)
+
+# Bring the FW parameters into a table
+FWparam0 <- as_tibble(coef(summary(m1b)), rownames = "Term") |>
+  separate_wider_delim(Term, delim = ":", names = c("a", "b"), 
+                       too_few = "align_start") |>
+  mutate(Geno = str_replace(a, "Geno", ""),
+         Param = ifelse(is.na(b), "Intercept", "Slope"),
+         Estimate = round(Estimate, digits = 3)) |>
+  select(Geno, Param, Estimate)
+
+# add Eberthart and Russel statilibty
+ERstab <- maize |> group_by(Geno) |> 
+  summarise(Estimate = var(res), .groups = "drop") |>
+  mutate(Param = "ERstab")
+
+FWparam <- bind_rows(FWparam0, ERstab) |>
+  pivot_wider(names_from = Param, values_from = Estimate)
+```
+
+In the table below the estimated parameters per genotype:
+
+```{r, echo=FALSE}
+reactable(FWparam,
+          columns = list(
+            Geno = colDef("Genotype", width = 120),
+            Param = colDef("Parameter")),
+          bordered = TRUE, highlight = TRUE, defaultPageSize = 10,
+          defaultSorted = c("Geno"), 
+          defaultColDef = colDef(width = 100, format = colFormat(digits = 3)))
+```
+
+In the table we see that every genotype has an intercept and a slope. The way to interpret these parameters is a follows:
+
+* **Intercept**: in a regression the intercept is the value of the response value when the explanatory variable equals to zero. In our example we have defined the environmental index as explanatory variable and we have defined the value zero as the "average" environment. So, the intercept represents the performance of the genotype in the "theoretical" average environment in the entire TPE, and we can call that the **general adaptation** of the genotype. For example G001 has a relatively high performance in comparison with for example G004, so we can conclude that G001 is a better general adapted genotype than G004.
+
+* **slope**: in a regression the slope describes the change in the response variable per unit of change in the explanatory variable. In our context that means the "rate" of change when the quality of the enviornment changes (for example improves), and we can call that the **adaptability** of the genotype. When we compare again G001 with G004, we see the slope of G001 equal to 1.237 and the one of G004 0.807. We conclude that G001 shows a higher adaptability than G004. If we consider that on average genotypes are expected a slope = 1, we also can conclude that G001 is more adaptable than the average and that G004 is less adaptable than the average genotype.
+
+In the last column we see the Eberthart and Russell stability variance which simply reflects the variance around the fitted line per genotype. The higher the value the more distant the observations were from the fitted line. This parameter can be associated with the stability performance (higher value less stable). In that respect, both G001 and G004 are relatively similar, maybe G004 a little bit more stable. G003 shows higher stability and similar general adaptation and adaptability than G001. G002 shows to be relatively less stable while performing in general well and showing good adaptability.
+
+In the plots below you can see these differences graphically:
+
+```{r, echo=FALSE, warning=FALSE, out.width="90%", fig.align='center', message=FALSE}
+toplot <- filter(maize, Geno %in% str_c("G00", 1:5))
+
+ggplot(toplot, aes(x = Env_index, y = yield, colour = Geno)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(x = "Environmental index") +
+  facet_wrap(~Geno)
+```
+
+
+## Summary
+
+* The Finlay-Wilkinson model is essentially a regression exercise where we use an environmental index as regressor. 
+
+* The quality index of the environments is simply defined by the overall mean of the genotypes.
+
+* The parameters of the model can be interpreted in terms of general adaptation or performance across the entire TPE (the intercept), the adaptability given by the slope, that is the capacity to become adapted or react to the increase in environmental quality, and we can look at the deviations from the regression lines as a measure of the consistency of performance, so related with the concept of stability.
+
+* The model allows predicting for other environments within the TPE as long as the TPE has been adequately sampled to construct the model.
+
+
